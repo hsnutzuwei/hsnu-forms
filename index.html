@@ -112,24 +112,69 @@ $('editor').addEventListener('change',e=>{if(e.target.dataset.path){const oldScr
 document.querySelectorAll('[data-form]').forEach(b=>b.addEventListener('click',()=>{current=b.dataset.form;refreshEditor();}));
 function toast(s){let t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(window.toaster);window.toaster=setTimeout(()=>t.classList.remove('show'),4000);}
 function queuePaint(){if(paintScheduled)return;paintScheduled=true;requestAnimationFrame(()=>{paintScheduled=false;paint();});}
-function painter(ctx,form){const cfg=FORMS[form];let scale=ctx.canvas.width/cfg.pw;const font='"DFKai-SB","標楷體","Noto Serif TC",serif';function t(str,x,y,opt={}){str=String(str??'').trim();if(!str)return;ctx.save();const maxW=opt.w?opt.w*scale:undefined;const size=(opt.size||9.5)*scale;ctx.fillStyle='#172126';ctx.textBaseline='middle';ctx.textAlign=opt.align||'center';ctx.font=`${size}px ${font}`;if(maxW){let width=ctx.measureText(str).width;if(width>maxW)ctx.font=`${Math.max(size*0.62,size*maxW/width)}px ${font}`;}ctx.fillText(str,x*scale,y*scale,maxW);ctx.restore();}
+// Field-trip preview only. Use Windows Kai locally; no font download is required.
+const FIELD_TRIP_PREVIEW_FONT='"DFKai-SB","標楷體","BiauKai","KaiTi","STKaiti","Noto Serif TC","Noto Serif CJK TC","PMingLiU","MingLiU",serif';
+function paintFieldTripPreview(ctx){
+ const f=model.fieldtrip,scale=ctx.canvas.width/FORMS.fieldtrip.pw;
+ function text(value,x,y,size=9,width){
+  value=String(value??'');if(!value)return;
+  ctx.save();ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`${size*scale}px ${FIELD_TRIP_PREVIEW_FONT}`;
+  if(width&&ctx.measureText(value).width>width*scale){
+   const fitted=size*scale*width*scale/ctx.measureText(value).width;
+   ctx.font=`${fitted}px ${FIELD_TRIP_PREVIEW_FONT}`;
+  }
+  ctx.fillText(value,x*scale,y*scale);ctx.restore();
+ }
+ function cell(values,x,top,height,size,width){
+  const strings=(Array.isArray(values)?values:[values]).map(v=>String(v??'')).filter(Boolean);
+  if(!strings.length)return;
+  // Match the Word writer's vertical columns and line spacing, including long input.
+  const capacity=Math.max(1,Math.floor((height-4)/(size*1.2))),columns=[];
+  for(const value of strings){const chars=[...value];for(let i=0;i<chars.length;i+=capacity)columns.push(chars.slice(i,i+capacity));}
+  const count=Math.max(...columns.map(c=>c.length));
+  ctx.save();ctx.beginPath();ctx.rect((x-width/2)*scale,top*scale,width*scale,height*scale);ctx.clip();
+  for(let i=0;i<count;i++){
+   const line=columns.slice().reverse().map(c=>c[i]||'　').join(columns.length===2?'　':'');
+   text(line,x,top+1.4+size*.6+i*size*1.2,size,width-1);
+  }
+  ctx.restore();
+ }
+ const heights=[56.9,55.95,55.95,55.95,57.85,56.9,56.9,56.9,55.95];
+ for(let copy=0;copy<2;copy++){
+  const off=copy*479.6;
+  cell([f.teacher,f.teacher2],off+339.25,151.7,168.8,10,54.5);
+  cell(f.subject,off+394.275,151.7,168.8,10,55.55);
+  cell(f.className,off+440.725,151.7,168.8,10,37.35);
+  let top=151.7;
+  f.periods.slice(0,9).forEach((p,i)=>{
+   cell(p.adjust,off+219.625,top,heights[i],8,37.35);
+   cell(p.schedule,off+256.975,top,heights[i],8,37.35);top+=heights[i];
+  });
+  cell(f.place,off+440.725,434.3,226.65,9,37.35);
+  const dateCenter=copy?831.025:351.375,timeCenter=copy?807.775:328.175;
+  [f.year,f.month,f.day].forEach((v,i)=>text(v,dateCenter,[445.85,501.25,556.45][i],8.5,28.1));
+  text(fieldHourText(f,'start'),timeCenter,532.1,8.5,19.8);
+  text(fieldHourText(f,'end'),timeCenter,612.9,8.5,19.8);
+  text(computedWeek(f.year,f.month,f.day),copy?830.85:350.85,617.8,9,20);
+  const appX=copy?949.125:469.475,appTop=copy?580.1:583.1;
+  [f.appYear,f.appMonth,f.appDay].forEach((v,i)=>text(v,appX,appTop+i*28.8,8.5,19.75));
+  const purpose={'參觀':[408.95,449.1],'訪問':[408.95,507.9],'研討會':[408.95,570.5],'實驗操作':[390.75,449.1],'相關環境教育':[390.75,549.6],'其他':[373.6,449.1]}[f.purpose];
+  if(purpose){ctx.save();ctx.fillStyle='#000';ctx.fillRect((off+purpose[0]-4.1)*scale,(purpose[1]-4.1)*scale,8.2*scale,8.2*scale);ctx.restore();}
+  if(f.purpose==='其他'){
+   [...String(f.purposeOther??'').replace(/\s/g,'')].forEach((c,i)=>text(c,off+373.6,494.2+i*8.4,7,19.2));
+  }
+ }
+}
+function refreshFieldTripPreviewFont(){if(current==='fieldtrip')queuePaint();}
+if(document.fonts){
+ document.fonts.ready.then(refreshFieldTripPreviewFont);
+ document.fonts.addEventListener('loadingdone',refreshFieldTripPreviewFont);
+}
+function painter(ctx,form){if(form==='fieldtrip'){paintFieldTripPreview(ctx);return;}const cfg=FORMS[form];let scale=ctx.canvas.width/cfg.pw;const font='"DFKai-SB","標楷體","Noto Serif TC",serif';function t(str,x,y,opt={}){str=String(str??'').trim();if(!str)return;ctx.save();const maxW=opt.w?opt.w*scale:undefined;const size=(opt.size||9.5)*scale;ctx.fillStyle='#172126';ctx.textBaseline='middle';ctx.textAlign=opt.align||'center';ctx.font=`${size}px ${font}`;if(maxW){let width=ctx.measureText(str).width;if(width>maxW)ctx.font=`${Math.max(size*0.62,size*maxW/width)}px ${font}`;}ctx.fillText(str,x*scale,y*scale,maxW);ctx.restore();}
 function vertical(str,x,y,opt={}){str=String(str??'').replace(/\s/g,'');let arr=[...str].slice(0,opt.max||16);const dy=opt.step||12.5;for(let i=0;i<arr.length;i++)t(arr[i],x,y+i*dy,{size:opt.size||9.7});}
 function mark(x,y){square(x,y);}function square(x,y){ctx.save();ctx.fillStyle='#111';ctx.fillRect((x-4.1)*scale,(y-4.1)*scale,8.2*scale,8.2*scale);ctx.restore();}
-if(form==='fieldtrip'){
- const f=model.fieldtrip;
- for(let copy=0;copy<2;copy++){let off=copy*479.6;
-  const both=[f.teacher,f.teacher2].filter(Boolean).join('、');
-  vertical(both,off+339,166,{max:16,step:13.4,size:9.6});vertical(f.subject,off+394,166,{max:12,step:14.5,size:10});vertical(f.className,off+441,166,{max:12,step:14.5,size:10});
-  f.periods.forEach((p,i)=>{let y=164+i*56.7;vertical(p.adjust,off+218,y,{max:5,step:11,size:9});vertical(p.schedule,off+256,y,{max:5,step:11,size:9});});
-  vertical(f.place,off+441,444,{max:17,step:12,size:9});
-  t(f.year,off+349.8,446,{w:25,size:10});t(f.month,off+349.8,501,{w:25,size:10});t(f.day,off+349.8,557,{w:25,size:10});
-  t(fieldHourText(f,'start'),off+323.9,531,{w:34,size:10});t(fieldHourText(f,'end'),off+323.9,603,{w:34,size:10});
-  t(yearWeek(f,''),off+350,596,{size:9});
-  t(f.appYear,off+480.3,575,{size:8.5});t(f.appMonth,off+480.3,619,{size:8.5});t(f.appDay,off+480.3,655,{size:8.5});
-  const positions={'參觀':[411.3,449],'訪問':[411.3,506.5],'研討會':[411.3,568.5],'實驗操作':[393.4,449],'相關環境教育':[393.4,548.5],'其他':[375.1,449]};let p=positions[f.purpose];if(p)square(off+p[0],p[1]);if(f.purpose==='其他')vertical(f.purposeOther,off+376,490,{max:9,step:11,size:8});
- }
-
-}else if(form==='course'){
+if(form==='course'){
  const v=model.course;const totals=courseHours();if(totals){v.totalDays=String(totals.days);v.totalHours=String(totals.hours);}
  t(v.schoolYear,291,57,{size:11,w:20});t(v.semester,385,57,{size:11,w:14});t(v.number,695,60,{size:9,w:33});t(v.submitMonth,337,121,{size:10,w:13});t(v.submitDay,366,121,{size:10,w:13});
  t(v.name,129,185,{size:12,w:95});const role={'主任':[77,142],'組長':[103,142],'導師':[132,142],'專任教師':[77,160]};if(role[v.role])mark(...role[v.role]);

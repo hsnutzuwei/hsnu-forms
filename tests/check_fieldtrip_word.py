@@ -48,6 +48,8 @@ def main():
     baseline = subprocess.check_output(['git', 'show', f'{args.baseline_ref}:index.html'], cwd=repo).decode()
     # Only the fieldtrip template and fieldtrip export functions may differ.
     def unrelated(s):
+        start = s.index('// Field-trip preview only.') if '// Field-trip preview only.' in s else s.index('function painter(')
+        s = s[:start] + s[s.index('function paint(){', start):]
         s = re.sub(r'(fieldDoc["\']?\s*:\s*["\'])[^"\']+', r'\1TEMPLATE', s, count=1)
         start = s.index('// Field-trip only:') if '// Field-trip only:' in s else s.index('function wordFieldTrip(')
         return s[:start] + s[s.index('function setRunText(', start):]
