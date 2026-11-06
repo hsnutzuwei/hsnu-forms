@@ -171,12 +171,42 @@ if(document.fonts){
  document.fonts.ready.then(refreshFieldTripPreviewFont);
  document.fonts.addEventListener('loadingdone',refreshFieldTripPreviewFont);
 }
+// Course-only overlays: the header note occupies its own line, as in Word.
+function paintCoursePreviewDetails(ctx,v,scale,font){
+ function clear(x,y,w,h){ctx.save();ctx.fillStyle='#fff';ctx.fillRect(x*scale,y*scale,w*scale,h*scale);ctx.restore();}
+ function draw(value,x,y,size=12,opt={}){
+  ctx.save();ctx.fillStyle='#000';ctx.textAlign=opt.align||'left';ctx.textBaseline='middle';
+  ctx.font=`${opt.bold?'bold ':''}${size*scale}px ${font}`;
+  if(opt.width)ctx.fillText(String(value),x*scale,y*scale,opt.width*scale);else ctx.fillText(String(value),x*scale,y*scale);
+  ctx.restore();
+ }
+ clear(29,40,784,88);
+ const title=`國立臺灣師範大學附屬高級中學 ${v.schoolYear||'　　'} 學年度 第 ${v.semester||'　'} 學期 教師請假 課務處理單`;
+ draw(title,31.2,56,18,{bold:true,width:615});
+ draw('編號：',692,57,12,{bold:true});draw(v.number||'',731,57,9,{width:72});
+ ctx.save();ctx.strokeStyle='#000';ctx.lineWidth=.5*scale;ctx.beginPath();ctx.moveTo(730*scale,64*scale);ctx.lineTo(805*scale,64*scale);ctx.stroke();ctx.restore();
+ const note='（本單於雲端差勤系統請假時，併同填寫以紙本送至教學組）';
+ ctx.save();ctx.font=`bold ${14*scale}px ${font}`;const noteWidth=Math.min(740,ctx.measureText(note).width/scale);ctx.fillStyle='#d9d9d9';ctx.fillRect(31.2*scale,79.9*scale,noteWidth*scale,19*scale);ctx.restore();
+ draw(note,31.2,89.4,14,{bold:true,width:740});
+ draw(`${v.submitMonth||'　'} 月 ${v.submitDay||'　'} 日填`,800,116,12,{bold:true,align:'right'});
+ // Leave the original borders intact while replacing the old fixed name spacing.
+ clear(81,441,379,52);
+ draw('擬請',122.1,469.2,12);
+ if(v.delegate)draw(v.delegate,170.1,469.2,12);
+ const nameWidth=v.delegate?[...String(v.delegate)].length*12+48:168;
+ draw('教師代理導師',146.1+nameWidth,469.2,12);
+ clear(573,441,233,52);
+ if(v.remark){
+  const chars=[...String(v.remark)];const perLine=26,lines=Math.ceil(chars.length/perLine);
+  for(let i=0;i<lines;i++)draw(chars.slice(i*perLine,(i+1)*perLine).join(''),589.05,472.2+(i-(lines-1)/2)*10,8,{width:208});
+ }
+}
 function painter(ctx,form){if(form==='fieldtrip'){paintFieldTripPreview(ctx);return;}const cfg=FORMS[form];let scale=ctx.canvas.width/cfg.pw;const font='"DFKai-SB","標楷體","Noto Serif TC",serif';function t(str,x,y,opt={}){str=String(str??'').trim();if(!str)return;ctx.save();const maxW=opt.w?opt.w*scale:undefined;const size=(opt.size||9.5)*scale;ctx.fillStyle='#172126';ctx.textBaseline='middle';ctx.textAlign=opt.align||'center';ctx.font=`${size}px ${font}`;if(maxW){let width=ctx.measureText(str).width;if(width>maxW)ctx.font=`${Math.max(size*0.62,size*maxW/width)}px ${font}`;}ctx.fillText(str,x*scale,y*scale,maxW);ctx.restore();}
 function vertical(str,x,y,opt={}){str=String(str??'').replace(/\s/g,'');let arr=[...str].slice(0,opt.max||16);const dy=opt.step||12.5;for(let i=0;i<arr.length;i++)t(arr[i],x,y+i*dy,{size:opt.size||9.7});}
 function mark(x,y){square(x,y);}function square(x,y){ctx.save();ctx.fillStyle='#111';ctx.fillRect((x-4.1)*scale,(y-4.1)*scale,8.2*scale,8.2*scale);ctx.restore();}
 if(form==='course'){
  const v=model.course;const totals=courseHours();if(totals){v.totalDays=String(totals.days);v.totalHours=String(totals.hours);}
- t(v.schoolYear,291,57,{size:11,w:20});t(v.semester,385,57,{size:11,w:14});t(v.number,695,60,{size:9,w:33});t(v.submitMonth,337,121,{size:10,w:13});t(v.submitDay,366,121,{size:10,w:13});
+ paintCoursePreviewDetails(ctx,v,scale,font);
  t(v.name,129,185,{size:12,w:95});const role={'主任':[77,142],'組長':[103,142],'導師':[132,142],'專任教師':[77,160]};if(role[v.role])mark(...role[v.role]);
  const leave={'公假派代':[37,247],'公假(無差旅費)':[37,261],'事假':[37,275],'病假':[73,275],'婚假':[37,289],'娩假':[73,289],'喪假':[109,289],'其他':[37,303]};if(leave[v.leaveType])mark(...leave[v.leaveType]);if(v.leaveType==='其他')t(v.leaveOther,118,303,{size:9,w:57});
  // left panel, date rows are labels fixed in the provided original document.
@@ -185,13 +215,15 @@ if(form==='course'){
  t(v.totalDays,80,424,{size:10,w:13});t(v.totalHours,106,424,{size:10,w:13});
  const x=[215,264,311,351,387,417,447,482,535,595,664,732,784];const widths=[48,48,39,26,25,25,25,37,44,36,78,48,45];
  v.rows.forEach((r,i)=>{let y=217+i*23.55;Object.keys(r).forEach((k,j)=>t(r[k],x[j],y,{size:8.5,w:widths[j]}));});
- t(v.delegate,181,468,{size:11,w:75});if(v.isHomeroom)mark(471,468);if(v.remark)t(v.remark,689,468,{size:8,w:70});
+ if(v.isHomeroom)mark(471,468);
 }else if(form==='guest'){
  const g=model.guest;
  const dw=computedWeek(g.year,g.month,g.day);const dateStr=[g.year,g.month,g.day].every(Boolean)?`${g.year}年${g.month}月${g.day}日（星期${dw}）`:'';
  t(g.reason,195,171,{size:11,w:280,align:'left'});t(g.carOwner,340,278,{size:11,w:270});t(g.plate,340,321,{size:11,w:270});
  if(dateStr||g.startHour||g.endHour){ctx.save();ctx.fillStyle='#fff';ctx.fillRect(182*scale,216*scale,321*scale,39*scale);ctx.restore();let desc=[dateStr, (g.startHour?timeText(g,'start'):'')+(g.startHour&&g.endHour?'－':'')+(g.endHour?timeText(g,'end'):'')].filter(Boolean).join('　');t(desc,193,235,{size:10.5,w:296,align:'left'});}
 }else if(form==='entry'){
+ // Match the Word footer's right edge to the centered 474.9pt table.
+ ctx.save();ctx.fillStyle='#fff';ctx.fillRect(450*scale,634*scale,105*scale,24*scale);ctx.font=`${11*scale}px ${font}`;ctx.fillStyle='#000';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('美術班115.3.',535.1*scale,646.8*scale);ctx.restore();
  const v=model.entry;v.rows.forEach((r,i)=>{const y=137.6+i*26.35;const ds=(r.month&&r.day)?`${r.year}.${r.month}.${r.day}`:'';t(ds,109.5,y,{size:10,w:83});t(r.name,244,y,{size:10.5,w:150});t(r.plate,433,y,{size:10,w:175});});
 
 }
@@ -286,7 +318,7 @@ function replaceCellText(doc,tc,needle,replacement){if(!tc||!needle)return;for(l
 function wordCourse(doc){
  const v=model.course,b=xmlDesc(doc,'body')[0],tbl=xmlDesc(doc,'tbl')[0],head=xmlDirect(b,'p')[0],stamp=xmlDirect(b,'p')[1];const headerRuns=xmlDirect(head,'r');if(headerRuns[14]){const x=newW(doc,'br'),r=headerRuns[14],t=xmlDesc(r,'t')[0];if(t)r.insertBefore(x,t);}const totals=courseHours();if(totals){v.totalDays=String(totals.days);v.totalHours=String(totals.hours);}
  // Replace only existing blank spaces in the original title, no shapes that disturb the page.
- if(v.schoolYear)setRunText(doc,head,2,v.schoolYear,9.5);
+ if(v.schoolYear)setRunText(doc,head,2,v.schoolYear,18);
  if(v.semester){let p=xmlDirect(head,'r')[4],t=xmlDesc(p,'t')[0];if(t)t.textContent=t.textContent.replace('第   學期',`第${v.semester}學期`);}
  if(v.number)setRunText(doc,head,10,v.number,9);
  if(v.submitMonth||v.submitDay){
@@ -313,9 +345,14 @@ function wordCourse(doc){
  if(v.totalHours){let r=xmlDirect(p[3],'r')[3],t=xmlDesc(r,'t')[0];if(t)t.textContent=t.textContent.replace('日    小時',`日 ${v.totalHours} 小時`);}
  const cols=['className','subject','day','weekday','period','parttime','tutorial','newDay','newWeekday','newPeriod','substitute','selfPay','schoolPay'];const gridIdx=[3,5,6,8,9,10,12,14,16,17,18,20,21];
  v.rows.forEach((r,i)=>{cols.forEach((col,j)=>{let cell=tableCellByGrid(doc,tbl,2+i,gridIdx[j]);if(cell)addTextToCell(doc,cell,r[col],false,j===10?8:7.5);});});
- if(v.delegate){let c=tableCellByGrid(doc,tbl,12,2);if(c){let para=xmlDirect(c,'p')[0];setRunText(doc,para,3,' '+v.delegate+' ',9);}}
+ // Keep two full-width spaces on either side of the larger delegate name.
+ if(v.delegate){let c=tableCellByGrid(doc,tbl,12,2);if(c){let para=xmlDirect(c,'p')[0];setRunText(doc,para,3,'　　'+v.delegate+'　　',12);}}
  if(v.isHomeroom){let c=tableCellByGrid(doc,tbl,12,13);replaceCellText(doc,c,'□ (兼任導師)','■ (兼任導師)');}
- if(v.remark){let c=tableCellByGrid(doc,tbl,12,17);if(c)addTextToCell(doc,c,v.remark,false,8);}
+ if(v.remark){let c=tableCellByGrid(doc,tbl,12,17);if(c){
+  const para=xmlDirect(c,'p')[0];let pp=xmlDirect(para,'pPr')[0];if(!pp){pp=newW(doc,'pPr');para.insertBefore(pp,para.firstChild);}
+  let ind=xmlDirect(pp,'ind')[0];if(!ind){ind=newW(doc,'ind');pp.appendChild(ind);}ind.setAttributeNS(WNS,'w:left','240');
+  addTextToCell(doc,c,v.remark,false,8);
+ }}
  // 原始課務單在表格後多留一個空白段落，造成空白第二頁；下載副本中移除該段落。
  let children=[...b.childNodes].filter(n=>n.nodeType===1),last=children[children.length-2];if(last?.localName==='p'&&!last.textContent.trim())b.removeChild(last);
 }
@@ -325,6 +362,14 @@ function wordGuest(doc){const f=model.guest,tbl=xmlDesc(doc,'tbl')[0];let rows=x
  const wk=computedWeek(f.year,f.month,f.day);let date=(f.year&&f.month&&f.day)?`${f.year}年${f.month}月${f.day}日（星期${wk}）`:'';
  const time=[date,timeText(f,'start'),timeText(f,'end')].filter(Boolean);replaceCellDisplay(doc,xmlDirect(rows[1],'tc')[1],date?(date+'   '+timeText(f,'start')+'－'+timeText(f,'end')):time.join('－'),11);
  replaceCellDisplay(doc,xmlDirect(rows[2],'tc')[1],f.carOwner,11);replaceCellDisplay(doc,xmlDirect(rows[3],'tc')[1],f.plate,11);
+}
+function alignEntryFooterToTable(doc,paragraph,table){
+ const section=xmlDesc(doc,'sectPr')[0],page=xmlDirect(section,'pgSz')[0],margins=xmlDirect(section,'pgMar')[0];
+ const pageWidth=Number(page.getAttributeNS(WNS,'w')),left=Number(margins.getAttributeNS(WNS,'left')),right=Number(margins.getAttributeNS(WNS,'right'));
+ const width=xmlDirect(xmlDirect(table,'tblGrid')[0],'gridCol').reduce((sum,col)=>sum+Number(col.getAttributeNS(WNS,'w')),0);
+ const inset=Math.max(0,Math.round((pageWidth-left-right-width)/2));
+ let pp=xmlDirect(paragraph,'pPr')[0];if(!pp){pp=newW(doc,'pPr');paragraph.insertBefore(pp,paragraph.firstChild);}
+ let ind=xmlDirect(pp,'ind')[0];if(!ind){ind=newW(doc,'ind');pp.appendChild(ind);}ind.setAttributeNS(WNS,'w:right',String(inset));
 }
 function centerEntryCell(doc,cell){
  if(!cell)return;
@@ -337,7 +382,7 @@ function centerEntryCell(doc,cell){
   sp.setAttributeNS(WNS,'w:before','0');sp.setAttributeNS(WNS,'w:after','0');
  }
 }
-function wordEntry(doc){const f=model.entry,tbl=xmlDesc(doc,'tbl')[0],rows=xmlDirect(tbl,'tr');const pp=xmlDesc(doc,'p').find(p=>xmlDesc(p,'t').some(t=>t.textContent.includes('美術班')));if(pp){for(const run of xmlDesc(pp,'r')){let rp=xmlDirect(run,'rPr')[0];if(!rp){rp=newW(doc,'rPr');run.insertBefore(rp,run.firstChild);}let sz=xmlDirect(rp,'sz')[0];if(!sz){sz=newW(doc,'sz');rp.appendChild(sz);}sz.setAttributeNS(WNS,'w:val','22');let szCs=xmlDirect(rp,'szCs')[0];if(szCs)szCs.setAttributeNS(WNS,'w:val','22');}}f.rows.forEach((r,i)=>{let cells=xmlDirect(rows[i+1],'tc');if(!cells.length)return;replaceCellDisplay(doc,cells[0],r.month&&r.day?`${r.year}.${r.month}.${r.day}`:'',9);replaceCellDisplay(doc,cells[1],r.name,10);replaceCellDisplay(doc,cells[2],r.plate,10);for(let c of cells.slice(0,3))centerEntryCell(doc,c);});}
+function wordEntry(doc){const f=model.entry,tbl=xmlDesc(doc,'tbl')[0],rows=xmlDirect(tbl,'tr');const pp=xmlDesc(doc,'p').find(p=>xmlDesc(p,'t').some(t=>t.textContent.includes('美術班')));if(pp){alignEntryFooterToTable(doc,pp,tbl);for(const run of xmlDesc(pp,'r')){let rp=xmlDirect(run,'rPr')[0];if(!rp){rp=newW(doc,'rPr');run.insertBefore(rp,run.firstChild);}let sz=xmlDirect(rp,'sz')[0];if(!sz){sz=newW(doc,'sz');rp.appendChild(sz);}sz.setAttributeNS(WNS,'w:val','22');let szCs=xmlDirect(rp,'szCs')[0];if(szCs)szCs.setAttributeNS(WNS,'w:val','22');}}f.rows.forEach((r,i)=>{let cells=xmlDirect(rows[i+1],'tc');if(!cells.length)return;replaceCellDisplay(doc,cells[0],r.month&&r.day?`${r.year}.${r.month}.${r.day}`:'',9);replaceCellDisplay(doc,cells[1],r.name,10);replaceCellDisplay(doc,cells[2],r.plate,10);for(let c of cells.slice(0,3))centerEntryCell(doc,c);});}
 function forceKaiDom(doc){
  for(const run of xmlDesc(doc,'r')){
   let rp=xmlDirect(run,'rPr')[0];if(!rp){rp=newW(doc,'rPr');run.insertBefore(rp,run.firstChild);}
