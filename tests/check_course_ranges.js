@@ -32,5 +32,5 @@ check(html.includes('value="1-3" selected')&&html.includes('value="2-4" selected
 check(!html.includes('</td>>'),'Unexpected literal markup');
 const restored=JSON.parse(JSON.stringify(api.model.course));
 check(restored.rows[0].period==='1-3'&&restored.rows[0].parttime==='V','Draft data did not round-trip');
-check(source.includes("replaceCellDisplay(doc,cell,'輔導課',7)"),'Single-line header missing');
+check(source.includes("[10,'兼課']")&&source.includes("[12,'輔導課']")&&source.includes("replaceCellDisplay(doc,cell,label,7)"),'Both headers must be 7pt');
 console.log('PASS: syntax, 45 period choices, V normalization, HTML cells, draft values; actual browser/DOCX rendering still required.');
