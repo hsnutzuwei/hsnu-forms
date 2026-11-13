@@ -114,13 +114,16 @@ function courseRowExtra(r,i,k){
  return '<td><input aria-label="第'+(i+1)+'列 '+k+'" data-path="'+path+'" maxlength="'+(k==='substitute'?12:8)+'" value="'+enc(r[k])+'"></td>';
 }
 function courseTutorialHeader(doc,table){
- const cell=tableCellByGrid(doc,table,1,12);if(!cell)return;
- replaceCellDisplay(doc,cell,'輔導課',7);
- const pr=xmlDirect(cell,'tcPr')[0];let margins=xmlDirect(pr,'tcMar')[0];
- if(!margins){margins=newW(doc,'tcMar');pr.insertBefore(margins,xmlDirect(pr,'vAlign')[0]||null);}
- for(const side of ['left','right']){
-  let edge=xmlDirect(margins,side)[0];if(!edge){edge=newW(doc,side);margins.appendChild(edge);}
-  edge.setAttributeNS(WNS,'w:w','28');edge.setAttributeNS(WNS,'w:type','dxa');
+ for(const [grid,label] of [[10,'兼課'],[12,'輔導課']]){
+  const cell=tableCellByGrid(doc,table,1,grid);if(!cell)continue;
+  replaceCellDisplay(doc,cell,label,7);
+  const pr=xmlDirect(cell,'tcPr')[0];let margins=xmlDirect(pr,'tcMar')[0];
+  if(!margins){margins=newW(doc,'tcMar');pr.insertBefore(margins,xmlDirect(pr,'vAlign')[0]||null);}
+  for(const side of ['left','right']){
+   let edge=xmlDirect(margins,side)[0];if(!edge){edge=newW(doc,side);margins.appendChild(edge);}
+   edge.setAttributeNS(WNS,'w:w','28');edge.setAttributeNS(WNS,'w:type','dxa');
+  }
+  let align=xmlDirect(pr,'vAlign')[0];if(!align){align=newW(doc,'vAlign');pr.appendChild(align);}align.setAttributeNS(WNS,'w:val','center');
  }
 }
 function courseEditor(){const v=model.course,leaveDateOpts=courseDateOptions(),hours=courseHours();
@@ -245,8 +248,8 @@ if(form==='course'){
  t(v.totalDays,80,424,{size:10,w:13});t(v.totalHours,106,424,{size:10,w:13});
  const x=[215,264,311,351,387,417,447,482,535,595,664,732,784];const widths=[48,48,39,26,25,25,25,37,44,36,78,48,45];
  // Keep the auxiliary-class heading on one line without moving the original grid.
- ctx.save();ctx.fillStyle='#fff';ctx.fillRect(435*scale,170*scale,25*scale,29*scale);ctx.restore();
- t('輔導課',447.5,184,{size:7,w:23});
+ ctx.save();ctx.fillStyle='#fff';ctx.fillRect(405*scale,170*scale,25*scale,29*scale);ctx.fillRect(435*scale,170*scale,25*scale,29*scale);ctx.restore();
+ t('兼課',417.5,184,{size:7,w:23});t('輔導課',447.5,184,{size:7,w:23});
  v.rows.forEach((r,i)=>{let y=217+i*23.55;Object.keys(r).forEach((k,j)=>t(k==='parttime'||k==='tutorial'?courseMark(r[k]):r[k],x[j],y,{size:8.5,w:widths[j]}));});
  if(v.isHomeroom)mark(471,468);
 }else if(form==='guest'){
