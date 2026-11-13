@@ -93,16 +93,49 @@ function courseHours(){const v=model.course;let sy=Number(v.startYear)+1911,ey=N
  }
  return {days:Math.floor(total/8),hours:Number((total%8).toFixed(2)),total};}
 function courseDateSelect(prefix,title){const v=model.course;let y=v[prefix+'Year'],m=v[prefix+'Month'],d=v[prefix+'Day'];let days=['',...Array.from({length:validDays(y,m)},(_,i)=>String(i+1))];return `<div class="formfield full"><label>${title}</label><div class="fields three">${dropdown('民國年',prefix+'Year',yrs())}${dropdown('月',prefix+'Month',['',...Array.from({length:12},(_,i)=>String(i+1))])}${dropdown('日',prefix+'Day',days)}</div><div class="weekday">星期：<strong>${computedWeek(y,m,d)?'星期'+computedWeek(y,m,d):'請選完整日期'}</strong></div></div>`;}
+function coursePeriodOptions(value=''){
+ const values=[''];for(let start=1;start<=9;start++)for(let end=start;end<=9;end++)values.push(start===end?String(start):start+'-'+end);
+ if(value&&!values.includes(String(value)))values.push(String(value));
+ return values;
+}
+function coursePeriodSelect(value,path,label){
+ return '<select aria-label="'+enc(label)+'" data-path="'+enc(path)+'">'+coursePeriodOptions(value).map(option=>'<option value="'+enc(option)+'" '+(option===String(value??'')?'selected':'')+'>'+enc(option||'—')+'</option>').join('')+'</select>';
+}
+function courseMark(value){
+ return value===true||(typeof value==='string'&&value.trim()!==''&&!/^(false|0)$/i.test(value.trim()))?'V':'';
+}
+function courseMarkCheckbox(value,path,label){
+ return '<input type="checkbox" aria-label="'+enc(label)+'" data-path="'+enc(path)+'" '+(courseMark(value)?'checked':'')+' style="width:18px;height:18px;display:block;margin:0 auto">';
+}
+function courseRowExtra(r,i,k){
+ const path='rows.'+i+'.'+k;
+ if(k==='parttime'||k==='tutorial')return '<td>'+courseMarkCheckbox(r[k],path,'第'+(i+1)+'列'+(k==='parttime'?'兼課':'輔導課'))+'</td>';
+ if(k==='newPeriod')return '<td>'+coursePeriodSelect(r[k],path,'第'+(i+1)+'列調課節次')+'</td>';
+ return '<td><input aria-label="第'+(i+1)+'列 '+k+'" data-path="'+path+'" maxlength="'+(k==='substitute'?12:8)+'" value="'+enc(r[k])+'"></td>';
+}
+function courseTutorialHeader(doc,table){
+ for(const [grid,label] of [[10,'兼課'],[12,'輔導課']]){
+  const cell=tableCellByGrid(doc,table,1,grid);if(!cell)continue;
+  replaceCellDisplay(doc,cell,label,7);
+  const pr=xmlDirect(cell,'tcPr')[0];let margins=xmlDirect(pr,'tcMar')[0];
+  if(!margins){margins=newW(doc,'tcMar');pr.insertBefore(margins,xmlDirect(pr,'vAlign')[0]||null);}
+  for(const side of ['left','right']){
+   let edge=xmlDirect(margins,side)[0];if(!edge){edge=newW(doc,side);margins.appendChild(edge);}
+   edge.setAttributeNS(WNS,'w:w','28');edge.setAttributeNS(WNS,'w:type','dxa');
+  }
+  let align=xmlDirect(pr,'vAlign')[0];if(!align){align=newW(doc,'vAlign');pr.appendChild(align);}align.setAttributeNS(WNS,'w:val','center');
+ }
+}
 function courseEditor(){const v=model.course,leaveDateOpts=courseDateOptions(),hours=courseHours();
  const fields=block('教師及填表資訊',`<div class="fields three">${input('學年度','schoolYear',{ph:'115',max:3})}${dropdown('學期','semester',['','1','2'])}${input('編號（選填）','number',{max:10})}${input('教師姓名','name',{max:12})}${dropdown('職稱','role',['主任','組長','導師','專任教師'])}</div><div class="fields" style="margin-top:10px">${courseDateSelect('submit','填表日期')}</div>`);
  const type=block('請假日期、時間與假別',`<div class="fields">${dropdown('假別','leaveType',['公假派代','公假(無差旅費)','事假','病假','婚假','娩假','喪假','其他'])}${input('其他假別','leaveOther',{max:18})}${courseDateSelect('start','請假開始日期')}${dropdown('開始時間（24 小時制）','startHour',['',...Array.from({length:24},(_,i)=>pad2(i))])}${courseDateSelect('end','請假結束日期')}${dropdown('結束時間（24 小時制）','endHour',['',...Array.from({length:24},(_,i)=>pad2(i))])}</div><div class="note">${hours?`暫估共 ${hours.days} 日 ${hours.hours} 小時（依平日 08–12／13–17、每日 8 小時試算；以學校實際請假規定為準）`:'選妥起訖日期與小時後，自動試算請假日數及時數。'}</div>`);
- const rows=block('原課程／調（補）課／代課教師',`<div class="rowscroll"><table class="gridtable"><thead><tr>${['列','班別','課程','原課日期','星期','節次','兼課','輔導課','調課月／日','調課星期','調課節次','代課教師','自付','學校付'].map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${v.rows.map((r,i)=>`<tr><td>${i+1}</td>${['className','subject'].map(k=>`<td><input data-path="rows.${i}.${k}" value="${enc(r[k])}" maxlength="12"></td>`).join('')}<td><select data-path="rows.${i}.day">${leaveDateOpts.map(o=>`<option value="${o}" ${r.day===o?'selected':''}>${o||'選日期'}</option>`).join('')}</select></td><td>${enc(r.weekday||'—')}</td><td><select data-path="rows.${i}.period">${['',...Array.from({length:9},(_,j)=>String(j+1))].map(o=>`<option value="${o}" ${r.period===o?'selected':''}>${o||'—'}</option>`).join('')}</select></td>${['parttime','tutorial','newDay','newWeekday','newPeriod','substitute','selfPay','schoolPay'].map(k=>`<td><input aria-label="第${i+1}列 ${k}" data-path="rows.${i}.${k}" maxlength="${k==='substitute'?12:8}" value="${enc(r[k])}"></td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="note">「原課日期」限選請假期間，星期自動計算；調（補）課日期可另外填寫。</div>`,'最多 10 列');
+ const rows=block('原課程／調（補）課／代課教師',`<div class="rowscroll"><table class="gridtable"><thead><tr>${['列','班別','課程','原課日期','星期','節次','兼課','輔導課','調課月／日','調課星期','調課節次','代課教師','自付','學校付'].map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${v.rows.map((r,i)=>`<tr><td>${i+1}</td>${['className','subject'].map(k=>`<td><input data-path="rows.${i}.${k}" value="${enc(r[k])}" maxlength="12"></td>`).join('')}<td><select data-path="rows.${i}.day">${leaveDateOpts.map(o=>`<option value="${o}" ${r.day===o?'selected':''}>${o||'選日期'}</option>`).join('')}</select></td><td>${enc(r.weekday||'—')}</td><td>${coursePeriodSelect(r.period,'rows.'+i+'.period','第'+(i+1)+'列原課節次')}</td>${['parttime','tutorial','newDay','newWeekday','newPeriod','substitute','selfPay','schoolPay'].map(k=>courseRowExtra(r,i,k)).join('')}</tr>`).join('')}</tbody></table></div><div class="note">「原課日期」限選請假期間，星期自動計算；原課與調課節次可選單節或連續範圍（例如 1-3、2-4）。兼課、輔導課有需要時勾選，預覽與 Word 顯示 V。</div>`,'最多 10 列');
  const note=block('備註',`<div class="fields">${input('擬請代理導師之教師','delegate',{max:12})}<div class="formfield"><label><input style="width:auto;vertical-align:middle" type="checkbox" data-path="isHomeroom" ${v.isHomeroom?'checked':''}> 兼任導師／系統請假已會簽學務處</label></div>${input('其他備註（選填）','remark',{full:true,max:50})}</div><div class="note">勾選項輸出為實心黑方格；保留簽核位置及原表單固定文字。</div>`);
  return fields+type+rows+note;}
 function guestEditor(){const v=model.guest;return block('外賓臨時停車資訊',`<div class="fields">${input('事由','reason',{full:true,ph:'如：講座、會議、參訪',max:80})}${input('車主','carOwner',{max:24})}${input('車號','plate',{max:20})}</div>`)+block('入校日期與停車時間',`<div class="fields">${dateSelectors('','停車日期')}${timeSelectors('開始時間','start')}${timeSelectors('結束時間','end')}</div>`,'選日期自動顯示星期，表單保留承辦人及主管簽章');}
 function entryEditor(){const v=model.entry;return block('入校人員名單',`<div class="rowscroll"><table class="gridtable"><thead><tr><th>序</th><th>民國年</th><th>月</th><th>日</th><th>姓名</th><th>備註（車號）</th></tr></thead><tbody>${v.rows.map((r,i)=>`<tr><td>${i+1}</td><td><select data-path="rows.${i}.year">${yrs().map(y=>`<option value="${y}" ${r.year===y?'selected':''}>${y}</option>`).join('')}</select></td><td><select data-path="rows.${i}.month">${['',...Array.from({length:12},(_,j)=>String(j+1))].map(m=>`<option value="${m}" ${m===r.month?'selected':''}>${m}</option>`).join('')}</select></td><td><select data-path="rows.${i}.day">${['',...Array.from({length:validDays(r.year,r.month)},(_,j)=>String(j+1))].map(d=>`<option value="${d}" ${d===r.day?'selected':''}>${d}</option>`).join('')}</select></td><td><input data-path="rows.${i}.name" maxlength="16" value="${enc(r.name)}" placeholder="入校人姓名"></td><td><input data-path="rows.${i}.plate" maxlength="25" value="${enc(r.plate)}" placeholder="車牌號碼／備註"></td></tr>`).join('')}</tbody></table></div><div class="note">與學校原表一致，保留 19 列；固定文字和簽核欄不變。</div>`);}
 function refreshEditor(){const el=$('editor');const editors={fieldtrip:fieldEditor,course:courseEditor,guest:guestEditor,entry:entryEditor};el.innerHTML=editors[current]();$('previewname').textContent=FORMS[current].name+(current==='fieldtrip'?' · 左右雙聯':'');document.querySelectorAll('[data-form]').forEach(x=>x.classList.toggle('active',x.dataset.form===current));queuePaint();}
-function setPath(key,val){let ks=key.split('.'),a=model[current];for(let i=0;i<ks.length-1;i++)a=a[ks[i]];a[ks.at(-1)]=val;if(current==='course'){let v=model.course;if(/^rows\.\d+\.day$/.test(key)){const n=Number(ks[1]),r=v.rows[n];let mm=Number((val||'').split('/')[0]),dd=Number((val||'').split('/')[1]);r.weekday=val?computedWeek(v.startYear,mm,dd):'';}}}
+function setPath(key,val){let ks=key.split('.'),a=model[current];for(let i=0;i<ks.length-1;i++)a=a[ks[i]];if(current==='course'&&/^rows\.\d+\.(parttime|tutorial)$/.test(key))val=courseMark(val);a[ks.at(-1)]=val;if(current==='course'){let v=model.course;if(/^rows\.\d+\.day$/.test(key)){const n=Number(ks[1]),r=v.rows[n];let mm=Number((val||'').split('/')[0]),dd=Number((val||'').split('/')[1]);r.weekday=val?computedWeek(v.startYear,mm,dd):'';}}}
 function normalizeDateAfterSelect(path){const m=path.match(/^(app)?(Year|Month|Day)$/);if(m){let pre=m[1]||'';let f=model[current];let y=pre?pre+'Year':'year',mo=pre?pre+'Month':'month',d=pre?pre+'Day':'day';if(f[d]&&Number(f[d])>validDays(f[y],f[mo]))f[d]=String(validDays(f[y],f[mo]));return true;} if(['year','month','day'].includes(path)){let f=model[current];if(f.day&&Number(f.day)>validDays(f.year,f.month))f.day=String(validDays(f.year,f.month));return true;}
  if(current==='course'&&/^(start|end|submit)(Year|Month|Day)$/.test(path)){const v=model.course;for(const row of v.rows){if(row.day&&!courseDateOptions().includes(row.day)){row.day='';row.weekday='';}}return true;}
  if(current==='entry'&&/rows\.\d+\.(year|month|day)/.test(path)){const i=Number(path.split('.')[1]),r=model.entry.rows[i];if(r.day&&Number(r.day)>validDays(r.year,r.month))r.day=String(validDays(r.year,r.month));return true;}
@@ -214,7 +247,10 @@ if(form==='course'){
  t(v.endMonth,34,381,{size:9,w:13});t(v.endDay,56,381,{size:8,w:9});t(v.endHalf,76,381,{size:9,w:9});t(v.endHour,95,381,{size:8,w:9});
  t(v.totalDays,80,424,{size:10,w:13});t(v.totalHours,106,424,{size:10,w:13});
  const x=[215,264,311,351,387,417,447,482,535,595,664,732,784];const widths=[48,48,39,26,25,25,25,37,44,36,78,48,45];
- v.rows.forEach((r,i)=>{let y=217+i*23.55;Object.keys(r).forEach((k,j)=>t(r[k],x[j],y,{size:8.5,w:widths[j]}));});
+ // Keep the auxiliary-class heading on one line without moving the original grid.
+ ctx.save();ctx.fillStyle='#fff';ctx.fillRect(405*scale,170*scale,25*scale,29*scale);ctx.fillRect(435*scale,170*scale,25*scale,29*scale);ctx.restore();
+ t('兼課',417.5,184,{size:7,w:23});t('輔導課',447.5,184,{size:7,w:23});
+ v.rows.forEach((r,i)=>{let y=217+i*23.55;Object.keys(r).forEach((k,j)=>t(k==='parttime'||k==='tutorial'?courseMark(r[k]):r[k],x[j],y,{size:8.5,w:widths[j]}));});
  if(v.isHomeroom)mark(471,468);
 }else if(form==='guest'){
  const g=model.guest;
@@ -316,7 +352,7 @@ function wordFieldTrip(doc){
 function setRunText(doc,paragraph,index,value,size){const r=xmlDirect(paragraph,'r')[index];if(!r)return;let text=xmlDesc(r,'t')[0];if(!text){text=newW(doc,'t');r.appendChild(text);}text.textContent=String(value);text.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');if(size){let rp=xmlDirect(r,'rPr')[0];if(!rp){rp=newW(doc,'rPr');r.insertBefore(rp,r.firstChild);}let sz=xmlDirect(rp,'sz')[0];if(!sz){sz=newW(doc,'sz');rp.appendChild(sz);}sz.setAttributeNS(WNS,'w:val',String(Math.round(size*2)));}}
 function replaceCellText(doc,tc,needle,replacement){if(!tc||!needle)return;for(let t of xmlDesc(tc,'t'))if(t.textContent.includes(needle)){t.textContent=t.textContent.replace(needle,replacement);return;}}
 function wordCourse(doc){
- const v=model.course,b=xmlDesc(doc,'body')[0],tbl=xmlDesc(doc,'tbl')[0],head=xmlDirect(b,'p')[0],stamp=xmlDirect(b,'p')[1];const headerRuns=xmlDirect(head,'r');if(headerRuns[14]){const x=newW(doc,'br'),r=headerRuns[14],t=xmlDesc(r,'t')[0];if(t)r.insertBefore(x,t);}const totals=courseHours();if(totals){v.totalDays=String(totals.days);v.totalHours=String(totals.hours);}
+ const v=model.course,b=xmlDesc(doc,'body')[0],tbl=xmlDesc(doc,'tbl')[0],head=xmlDirect(b,'p')[0],stamp=xmlDirect(b,'p')[1];courseTutorialHeader(doc,tbl);const headerRuns=xmlDirect(head,'r');if(headerRuns[14]){const x=newW(doc,'br'),r=headerRuns[14],t=xmlDesc(r,'t')[0];if(t)r.insertBefore(x,t);}const totals=courseHours();if(totals){v.totalDays=String(totals.days);v.totalHours=String(totals.hours);}
  // Replace only existing blank spaces in the original title, no shapes that disturb the page.
  if(v.schoolYear)setRunText(doc,head,2,v.schoolYear,18);
  if(v.semester){let p=xmlDirect(head,'r')[4],t=xmlDesc(p,'t')[0];if(t)t.textContent=t.textContent.replace('第   學期',`第${v.semester}學期`);}
@@ -344,7 +380,7 @@ function wordCourse(doc){
  if(v.totalDays)setRunText(doc,p[3],1,v.totalDays,9);
  if(v.totalHours){let r=xmlDirect(p[3],'r')[3],t=xmlDesc(r,'t')[0];if(t)t.textContent=t.textContent.replace('日    小時',`日 ${v.totalHours} 小時`);}
  const cols=['className','subject','day','weekday','period','parttime','tutorial','newDay','newWeekday','newPeriod','substitute','selfPay','schoolPay'];const gridIdx=[3,5,6,8,9,10,12,14,16,17,18,20,21];
- v.rows.forEach((r,i)=>{cols.forEach((col,j)=>{let cell=tableCellByGrid(doc,tbl,2+i,gridIdx[j]);if(cell)addTextToCell(doc,cell,r[col],false,j===10?8:7.5);});});
+ v.rows.forEach((r,i)=>{cols.forEach((col,j)=>{let cell=tableCellByGrid(doc,tbl,2+i,gridIdx[j]);if(cell)addTextToCell(doc,cell,col==='parttime'||col==='tutorial'?courseMark(r[col]):r[col],false,j===10?8:7.5);});});
  // Keep two full-width spaces on either side of the larger delegate name.
  if(v.delegate){let c=tableCellByGrid(doc,tbl,12,2);if(c){let para=xmlDirect(c,'p')[0];setRunText(doc,para,3,'　　'+v.delegate+'　　',12);}}
  if(v.isHomeroom){let c=tableCellByGrid(doc,tbl,12,13);replaceCellText(doc,c,'□ (兼任導師)','■ (兼任導師)');}
