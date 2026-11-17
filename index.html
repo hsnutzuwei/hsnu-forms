@@ -573,6 +573,10 @@ $('editor').addEventListener('change',e=>{
 });
 function paintReceipt(){
  const image=imgs.receipt;if(!image?.complete)return;const can=$('preview');can.width=image.naturalWidth;can.height=image.naturalHeight;const ctx=can.getContext('2d'),scale=can.width/595.3;ctx.drawImage(image,0,0);
+ // Align the two approval labels in the preview; the Excel template stays intact.
+ ctx.save();ctx.fillStyle='#fff';ctx.fillRect(98*scale,248.3*scale,77*scale,29*scale);
+ ctx.fillStyle='#000';ctx.font=`${9.091*scale}px "華康細黑體","Microsoft JhengHei","PingFang TC","Noto Sans CJK TC",sans-serif`;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+ ctx.fillText('會辦單位：',118.5*scale,258.887*scale);ctx.fillText('總務處',118.5*scale,273.623*scale);ctx.restore();
  let values;try{values=receiptValues();}catch(e){return;}const f=model.receipt;
  function draw(addr,value,numeric=false){
   if(value===null||value===undefined||value==='')return;const box=RECEIPT_LAYOUT.cells[addr];if(!box)return;
