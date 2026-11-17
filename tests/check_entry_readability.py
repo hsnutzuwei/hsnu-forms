@@ -65,8 +65,9 @@ def main():
     if run.find('w:t',NS) is not None:assert run.find('w:rPr/w:sz',NS).get('{'+W+'}val')=='28'
   texts=''.join(root.xpath('//w:t/text()',namespaces=NS))
   assert '承辦人：' in texts and '單位主管：' in texts
+  assert '姓名：' not in texts and '日期：' not in texts
   if label=='empty':assert '姓名：' not in texts and '日期：' not in texts
-  if label=='full':assert all(x in texts for x in ['姓名：陳小明','姓名：林小華','115年11月17日','115年11月18日'])
-  if label=='handler-only':assert '姓名：陳小明' in texts and '日期：' not in texts and '姓名：林小華' not in texts
+  if label=='full':assert all(x in texts for x in ['　　陳小明','　　林小華','　　115年11月17日','　　115年11月18日'])
+  if label=='handler-only':assert '　　陳小明' in texts and '日期：' not in texts and '　　林小華' not in texts
  print('PASS: mobile remark input, all filled cells 14pt, optional/blank signing fields, legacy/new drafts, 19 rows, three other Word exports and Canvas unchanged; render all entry DOCX for page/overlap checks.')
 if __name__=='__main__':main()

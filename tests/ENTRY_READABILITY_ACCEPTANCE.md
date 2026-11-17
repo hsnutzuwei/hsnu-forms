@@ -41,3 +41,7 @@ python tests/check_entry_readability.py --browser /usr/bin/chromium --output-dir
 - [即時預覽](evidence/entry-readable/preview.png)
 
 測試文件使用虛構姓名及備註。本分支供確認，尚未合併或部署。
+
+## 簽核縮排調整（2026-11-17）
+
+依使用者確認，簽核資訊移除「姓名：」「日期：」，每一行資料前保留兩個全形空格；承辦人與主管皆相同，預覽同步。原大字及蓋章段落保留。已重新實際下載與渲染最滿案例，仍為 A4 單頁；承辦人資料 x=80.30 pt、主管資料 x=295.40 pt，分別相對原資料起點向右 20 pt。新舊草稿及其他三張表單回歸檢查通過。
