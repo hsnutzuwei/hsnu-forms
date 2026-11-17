@@ -542,7 +542,7 @@ function receiptValues(f=model.receipt){
   result.lecture=rate===null||units===null?null:rate*units;
   if(result.lecture!==null&&!Number.isSafeInteger(result.lecture))throw Error('計算結果有小數，請核定整數金額或改為直接填金額');
  }
- result.total=RECEIPT_FEES.reduce((sum,[,key])=>sum+(result[key]??0),0);return result;
+ result.total=RECEIPT_FEES.every(([,key])=>result[key]===null)?null:RECEIPT_FEES.reduce((sum,[,key])=>sum+(result[key]??0),0);return result;
 }
 function receiptRocDate(value){return entrySignDate(value);}
 function receiptNotes(f=model.receipt,values=receiptValues(f)){
@@ -579,10 +579,10 @@ function paintReceipt(){
  ctx.fillText('會辦單位：',118.5*scale,258.887*scale);ctx.fillText('總務處',118.5*scale,273.623*scale);ctx.restore();
  let values;try{values=receiptValues();}catch(e){return;}const f=model.receipt;
  function draw(addr,value,numeric=false){
-  if(value===null||value===undefined||value==='')return;const box=RECEIPT_LAYOUT.cells[addr];if(!box)return;
+  const box=RECEIPT_LAYOUT.cells[addr];if(!box)return;
   const [x,y,w,h]=box;let size=12*RECEIPT_LAYOUT.fontScale,lines=[];
   function wrap(){lines=[];for(const para of String(value).split('\n')){let line='';for(const c of para){if(line&&ctx.measureText(line+c).width>(w-4)*scale){lines.push(line);line='';}line+=c;}lines.push(line);}}
-  ctx.save();ctx.fillStyle=['C21','E21','G21','G25','I25'].includes(addr)?'#ffffcc':'#fff';ctx.fillRect((x+.6)*scale,(y+.6)*scale,(w-1.2)*scale,(h-1.2)*scale);ctx.beginPath();ctx.rect(x*scale,y*scale,w*scale,h*scale);ctx.clip();ctx.fillStyle='#000';ctx.textBaseline='middle';
+  ctx.save();ctx.fillStyle=['C21','E21','G21','G25','I25'].includes(addr)?'#ffffcc':'#fff';ctx.fillRect((x+.6)*scale,(y+.6)*scale,(w-1.2)*scale,(h-1.2)*scale);if(value===null||value===undefined||value===''){ctx.restore();return;}ctx.beginPath();ctx.rect(x*scale,y*scale,w*scale,h*scale);ctx.clip();ctx.fillStyle='#000';ctx.textBaseline='middle';
   do{ctx.font=`${size*scale}px "華康細黑體","Microsoft JhengHei","PingFang TC","Noto Sans CJK TC",sans-serif`;wrap();if(lines.length*size*1.2<h-3)break;size-=.25;}while(size>4);
   ctx.textAlign=numeric?'right':(['A2','G3','G27','G21','G25'].includes(addr)?'left':'center');
   const topAligned=addr==='G3'||addr==='G27';
@@ -590,8 +590,8 @@ function paintReceipt(){
   lines.forEach((line,i)=>ctx.fillText(line,(numeric?x+w-2:ctx.textAlign==='left'?x+2:x+w/2)*scale,(textTop+(i+.5)*size*1.2)*scale));ctx.restore();
  }
  for(const [,key,lower,upper] of RECEIPT_FEES){draw(lower,receiptMoney(values[key]),true);draw(upper,receiptMoney(values[key]),true);}draw('E10',receiptMoney(values.total),true);draw('E30',receiptMoney(values.total),true);
- draw('A2',f.reason?'事由：'+f.reason:'');draw('B21',f.name);draw('E21',f.idNumber);draw('G21',f.address);draw('I25',f.account);
- if(receiptBankText())draw('G25',receiptBankText());const notes=receiptNotes(f,values);draw('G3',notes?'備註:'+notes:'');draw('G27',notes?'備註:'+notes:'');
+ draw('A2','事由：'+(f.reason||''));draw('B21',f.name);draw('E21',f.idNumber);draw('G21',f.address);draw('I25',f.account);
+ if(receiptBankText())draw('G25',receiptBankText());const notes=receiptNotes(f,values);draw('G3','備註：\n'+notes);draw('G27','備註：\n'+notes);
 }
 async function makeReceiptXlsx(){
  try{
@@ -607,9 +607,9 @@ async function makeReceiptXlsx(){
    else{c.setAttribute('t','inlineStr');const is=el('is'),t=el('t');t.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');t.textContent=String(value??'');is.appendChild(t);c.appendChild(is);}
   }
   for(const [,key,lower,upper] of RECEIPT_FEES){const n=values[key];set(lower,n??'');set(upper,n??'',`IF(${lower}="","",${lower})`);}
-  set('E10',values.total,'SUM(E3:E9)');set('E30',values.total,'SUM(E23:E29)');
+  set('E10',values.total??'','IF(COUNT(E3:E9)=0,"",SUM(E3:E9))');set('E30',values.total??'','IF(COUNT(E23:E29)=0,"",SUM(E23:E29))');
   set('A2','事由：'+(f.reason||''));set('B21',f.name||'');set('C21','');set('E21',f.idNumber||'');set('G21',f.address||'');set('G25',receiptBankText(f)||'□         銀行       分行      □ 郵局');set('I25',String(f.account||''));
-  set('G27','備註:'+(notes||''));set('G3','備註:'+(notes||''),'G27');
+  set('G27','備註：\n'+(notes||''));set('G3','備註：\n'+(notes||''));
   zip.file('xl/worksheets/sheet1.xml',new XMLSerializer().serializeToString(dom));
   downloadBlob(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'印領清冊_可編輯.xlsx');toast('Excel 領據已下載，上下資料同步；請確認版面後列印。');
  }catch(e){console.error(e);toast('領據產生失敗：'+e.message);}
