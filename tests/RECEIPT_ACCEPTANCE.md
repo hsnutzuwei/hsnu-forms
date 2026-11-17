@@ -26,3 +26,9 @@ LibreOffice 將實際下載 XLSX 轉 PDF，自動備註與手動備註版本皆�
 - [人事總處說明](https://www.dgpa.gov.tw/ebook/book005/files/ebook.pdf)：一般外聘國內講座上限2,000、有隸屬關係1,500、內聘1,000；實際協助教學的講座助理按同課程講座減半。
 - [出席費規定](https://law.dgbas.gov.tw/LawContent.aspx?id=FL000752)：符合條件的外部專家諮詢會議，115年底前上限2,500；116/1/1起3,000，不適用於一般授課加領。
 - [銀行資料來源及授權](https://data.gov.tw/dataset/6041)：政府資料開放授權條款第1版。僅保留機構代碼、名稱及分行，不含地址、負責人資訊。
+
+## 預覽定位修正（PR 後續）
+
+僅調整 `paintReceipt()` 與預覽座標資料。先前以 Excel 字寬、預設列高推估座標，與實際 PDF 的格線有差距，覆蓋文字時可能遮到框線。現改用空白版型 PDF 實際格線座標；校正受款人 B21:B25、黃底資料、金額與備註的位置。填寫文字優先華康細黑體，再依裝置使用微軟正黑體、蘋方、Noto Sans CJK TC 或 sans-serif，接近原表格黑體。事由靠左，上下備註靠左上。
+
+重跑瀏覽器實測，領據下載的所有 XLSX ZIP 項目與修正前完全一致，原四張表單的 Word 與預覽亦完全一致。人工檢視 [修改前](evidence/receipt/preview-before.png)／[修改後](evidence/receipt/preview-after.png)，文字不再遮住格線，事由與備註對齊儲存格邊界。Excel 範本及下載程式未修改。
