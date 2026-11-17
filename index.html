@@ -460,7 +460,7 @@ function entrySignDate(value){
  const year=Number(m[1])-1911,month=Number(m[2]),day=Number(m[3]);
  return year>0&&month>=1&&month<=12&&day>=1&&day<=validDays(year,month)?`${year}年${month}月${day}日`:'';
 }
-function entrySignLines(f,role){const name=entryCellValue(f[role+'Name']),date=entrySignDate(f[role+'Date']);return [name?'姓名：'+name:'',date?'日期：'+date:''];}
+function entrySignLines(f,role){const name=entryCellValue(f[role+'Name']),date=entrySignDate(f[role+'Date']);return [name?'　　'+name:'',date?'　　'+date:''];}
 function formatEntryCell(doc,cell){
  centerEntryCell(doc,cell);
  const pr=xmlDirect(cell,'tcPr')[0];let margins=xmlDirect(pr,'tcMar')[0];
