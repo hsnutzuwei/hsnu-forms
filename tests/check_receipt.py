@@ -42,3 +42,16 @@ assert w['I25'].value=='001234567890';assert w['B21'].value=='測試講師';asse
 for c in ['C21','E21','G21','G25','I25']:assert w[c].fill.fgColor.rgb=='FFFFFFCC'
 w=load_workbook(out/'manual.xlsx',data_only=True).active;assert w['G3'].value==w['G27'].value=='備註：\n上下同步備註測試'
 print('PASS receipt calculations, synchronization, bank selection, leading zeros, yellow cells, draft roundtrip; all four existing Word packages and previews unchanged')
+
+# Inspect raw OOXML before any spreadsheet library normalizes merged borders.
+from lxml import etree as E
+with ZipFile(out/'filled.xlsx') as z:
+ ns={'s':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+ sh=E.fromstring(z.read('xl/worksheets/sheet1.xml'));st=E.fromstring(z.read('xl/styles.xml'));xfs=st.find('s:cellXfs',ns);borders=st.find('s:borders',ns)
+ def edge(addr,side):
+  c=sh.find('.//s:c[@r="'+addr+'"]',ns);b=borders[int(xfs[int(c.get('s','0'))].get('borderId'))];return b.find('s:'+side,ns).get('style')
+ for i in range(1,11):assert edge('A'+str(i),'left')=='medium' and edge('I'+str(i),'right')=='medium'
+ for c in 'ABCDEFGHI':assert edge(c+'1','top')=='medium' and edge(c+'10','bottom')=='medium'
+ for a,e in [('A2','right'),('A3','bottom'),('G3','right'),('G3','bottom')]:assert edge(a,e)=='medium'
+ assert edge('C4','bottom')=='thin'
+print('PASS raw OOXML: all four upper-table outer edges medium, internal edge thin')
