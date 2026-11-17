@@ -13,6 +13,7 @@ with sync_playwright() as p:
  with page.expect_download() as d:page.locator('#docx').click()
  d.value.save_as(out/'empty.xlsx')
  empty=load_workbook(out/'empty.xlsx',data_only=True).active
+ assert empty['G25'].value=='□　銀行　　分行\n□　郵局'
  for a in ['E3','E4','E5','E6','E7','E8','E9','E10','E23','E24','E25','E26','E27','E28','E29','E30']:assert empty[a].value in [None,''],(a,empty[a].value)
 
  for key,value in dict(reason='美術班專題講座',name='測試講師',title='教授',topic='藝術與生活',activityDate='2026-11-17',startTime='13:00',endTime='15:00',units='2',assistant='1000',attendance='2500',car='1200',train='300',hsr='1500',lodging='2000',idNumber='A123456789',address='臺北市大安區測試路一號',account='001234567890').items():page.locator(f'[data-path="{key}"]').fill(value)
